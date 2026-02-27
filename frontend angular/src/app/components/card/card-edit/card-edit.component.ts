@@ -3,13 +3,15 @@ import {FormBuilder, FormControl, FormGroup, FormsModule, ReactiveFormsModule, V
 import {ServiceCardService} from '../../../service/service-card.service';
 import {ActivatedRoute, Router, RouterLink} from '@angular/router';
 import Swal from 'sweetalert2';
+import {CommonModule} from '@angular/common';
 
 @Component({
   selector: 'app-card-edit',
   imports: [
     FormsModule,
     ReactiveFormsModule,
-    RouterLink
+    RouterLink,
+    CommonModule
   ],
   templateUrl: './card-edit.component.html',
   styleUrls: ['./card-edit.component.css']
