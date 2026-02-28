@@ -6,9 +6,39 @@
  * Exporta mongoose y una función connectDB.
  */
 const mongoose = require('mongoose');
-const URI = process.env.MONGODB_URI || 'mongodb+srv://Mario:marioYHector@cluster0.uqj3rpc.mongodb.net/?appName=Cluster0';
-mongoose.connect(URI)
-    .then(db => console.log('DB is connected'))
-    .catch(err => console.error(err));
+require('dotenv').config();
 
-module.exports = mongoose;
+const LOCAL_URI = 'mongodb+srv://Mario:marioYHector@cluster0.uqj3rpc.mongodb.net/?appName=Cluster0';
+const URI = process.env.MONGODB_URI || LOCAL_URI;
+
+let mongooseConnection = null;
+
+async function connectDB() {
+    if (mongooseConnection) {
+        return mongooseConnection;
+    }
+
+    try {
+        mongooseConnection = await mongoose.connect(URI);
+        console.log(`DB is connected (${URI.includes('127.0.0.1') ? 'local' : 'atlas'})`);
+        return mongooseConnection;
+    } catch (err) {
+        if (!process.env.MONGODB_URI) {
+            console.error('Atlas connection failed:', err.message);
+            console.log('Trying local MongoDB at mongodb://127.0.0.1:27017/ManaMarket ...');
+            try {
+                mongooseConnection = await mongoose.connect(LOCAL_URI);
+                console.log('DB is connected (local fallback)');
+                return mongooseConnection;
+            } catch (localErr) {
+                console.error('Local MongoDB connection failed:', localErr.message);
+                throw localErr;
+            }
+        }
+
+        console.error('Database connection error:', err.message);
+        throw err;
+    }
+}
+
+module.exports = { mongoose, connectDB };
