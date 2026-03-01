@@ -2,9 +2,11 @@
 const express = require('express');
 const cors = require('cors');
 const morgan = require('morgan');
-const mongoose = require('mongoose');
 const app = express();
-const {json} = require('express');
+const { json } = require('express');
+
+// Conectar siempre a la base de datos usando database.js (mismo comportamiento en local y en Vercel)
+const db = require('./database');
 
 //Middlewares
 app.use(morgan('dev'));
@@ -21,38 +23,11 @@ app.use('/', (req, res) => res.send('API is in /api/v1/cartas/ or /api/v1/cards/
 //Settings
 app.set('port', process.env.PORT || 3000);
 
-// Conexión a la base de datos
-let db;
-
-// Consideramos "entorno serverless" si estamos en Vercel o si existe MONGODB_URI
-const isServerless = !!(process.env.VERCEL || process.env.MONGODB_URI);
-
-if (isServerless) {
-    // En Vercel/entorno serverless usamos siempre la cadena de conexión desde la variable de entorno
-    const uri = process.env.MONGODB_URI || 'mongodb+srv://hecmardom_db_user:MarioYHector@manamarket.3lsst8d.mongodb.net/ManaMarket?appName=ManaMarket';
-
-    // Solo conectamos si aún no hay conexión abierta
-    if (mongoose.connection.readyState === 0) {
-        mongoose
-            .connect(uri, {
-                useNewUrlParser: true,
-                useUnifiedTopology: true,
-            })
-            .then(() => console.log('DB is connected (serverless runtime)'))
-            .catch(err => console.error('DB connection error (serverless runtime):', err));
-    }
-
-    db = mongoose;
-} else {
-    // En local mantenemos el comportamiento existente usando database.js
-    db = require('./database');
-}
-
 // Exportar la app para que Vercel la use como serverless function
 module.exports = app;
 
-// En entorno local (no serverless) levantamos el servidor escuchando en un puerto
-if (!isServerless) {
+// En entorno local levantamos el servidor escuchando en un puerto
+if (!process.env.VERCEL) {
     // iniciar el server solo cuando la base de datos esté lista
     if (db.connection.readyState === 1) {
         app.listen(app.get('port'), () => {
