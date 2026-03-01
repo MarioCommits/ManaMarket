@@ -62,16 +62,35 @@ cartaCtrl.addCarta = async (req, res) => {
 
 // Actualizar una carta
 cartaCtrl.updateCarta = async (req, res) => {
-    const carta = req.body;
-    await Carta.findByIdAndUpdate(
-        req.params.id,
-        {$set: carta},
-        {new: true})
-        .then((data)=> {
-            if(data)res.status(200).json({status:'Carta Successully Updated'});
-            else res.status(404).json({status:'Carta not found'})
-        })
-        .catch((err)=>res.status(400).json({status:err}));
+    // El frontend envía los campos en inglés, igual que en addCarta
+    const { name, year, expansion, price, rarity, text, imageUrl } = req.body;
+
+    // Construir el objeto de actualización mapeando a los nombres del esquema
+    const update = {};
+    if (name !== undefined) update.nombre = name;
+    if (year !== undefined) update.year = year;
+    if (expansion !== undefined) update.expansion = expansion;
+    if (price !== undefined) update.precio = price;
+    if (rarity !== undefined) update.rareza = rarity;
+    if (text !== undefined) update.texto = text;
+    if (imageUrl !== undefined) update.imagen = imageUrl;
+
+    try {
+        const data = await Carta.findByIdAndUpdate(
+            req.params.id,
+            { $set: update },
+            { new: true, runValidators: true }
+        );
+
+        if (data) {
+            return res.status(200).json({ status: 'Carta Successfully Updated', data });
+        } else {
+            return res.status(404).json({ status: 'Carta not found' });
+        }
+    } catch (err) {
+        const message = err && err.message ? err.message : JSON.stringify(err);
+        return res.status(400).json({ status: message || 'Error desconocido' });
+    }
 };
 
 // Eliminar una carta
