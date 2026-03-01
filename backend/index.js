@@ -12,8 +12,11 @@ app.use(cors());
 app.use(express.json());
 
 //Routes
+// Rutas originales en español
 app.use('/api/v1/cartas', require('./routes/cartas.route'));
-app.use('/', (req, res) => res.send('API is in /api/v1/cartas/'));
+// Nuevas rutas en inglés para compatibilidad con los frontends Angular y React
+app.use('/api/v1/cards', require('./routes/cartas.route'));
+app.use('/', (req, res) => res.send('API is in /api/v1/cartas/ or /api/v1/cards/'));
 
 //Settings
 app.set('port', process.env.PORT || 3000);
