@@ -21,17 +21,14 @@ En conclusión, tanto técnica como económicamente, el proyecto Mana Market es 
 
 3.0 API Endpoints (Backend)
 
-Base URL:
-- `http://localhost:3000/api/v1`
+Base URL del recurso principal de cartas:
+- `http://localhost:3000/api/v1/cartas`
 
 Formato general de respuestas:
 - Éxito en listados/detalle: `{ "status": ... }`
-- Éxito en creación/actualización/borrado: `{ "status": "... Successfully ..." }`
-- Error de validación o ID inválido: HTTP 400 con `{ "status": error }`
-- No encontrado: HTTP 404 con `{ "status": "... not found" }`
-
-Nota:
-- Existe compatibilidad hacia atrás para películas usando `/movies` además de `/cards`.
+- Éxito en creación/actualización/borrado: `{ "status": "..." }` (mensajes en español)
+- Error de validación o ID inválido: HTTP 400 con `{ "status": "..." }`
+- No encontrado: HTTP 404 con `{ "status": "Carta not found" }`
 
 ---
 
@@ -47,377 +44,164 @@ curl -X GET http://localhost:3000/
 
 Respuesta esperada (200):
 ```text
-API is in /api/v1/cards/
+API is in /api/v1/cartas/
 ```
 
 ---
 
-### 3.2 Cards (y Movies por compatibilidad)
+### 3.2 Cartas
 
-Modelo `Card` (campos requeridos):
+#### Modelo lógico en la API
+
+Para crear una carta desde clientes (Postman, frontends), el endpoint de creación espera **campos en inglés** en el cuerpo de la petición. Estos se mapean internamente al modelo de base de datos.
+
+Campos requeridos en el body (JSON) de creación:
 - `name` (string)
-- `collection` (string)
-- `rarity` (string)
-- `type` (string)
+- `year` (number)
+- `expansion` (string)
 - `price` (number >= 0)
-- `stock` (number >= 0)
-- `language` (string)
-- `condition` (string)
+- `rarity` (string)
+- `text` (string)
 - `imageUrl` (string, URL de imagen de la carta)
 
-#### GET /api/v1/cards
+Internamente se guardan como:
+- `nombre`, `year`, `expansion`, `precio`, `rareza`, `texto`, `imagen`.
+
+---
+
+#### GET /api/v1/cartas
 Lista todas las cartas.
 
 Ejemplo:
 ```bash
-curl -X GET http://localhost:3000/api/v1/cards
+curl -X GET http://localhost:3000/api/v1/cartas
 ```
 
 Respuesta ejemplo (200):
 ```json
 {
-	"status": [
-		{
-			"_id": "65f0c1a2b3c4d5e6f7a8b9c0",
-			"name": "Lightning Bolt",
-			"collection": "Revised",
-			"rarity": "Common",
-			"type": "Instant",
-			"price": 4.5,
-			"stock": 12,
-			"language": "EN",
-			"condition": "NM",
-			"imageUrl": "https://example.com/images/lightning-bolt.jpg",
-			"createdAt": "2026-02-20T10:00:00.000Z",
-			"updatedAt": "2026-02-20T10:00:00.000Z"
-		}
-	]
+  "status": [
+    {
+      "_id": "6650c1a2b3c4d5e6f7a8b9c0",
+      "nombre": "Black Lotus",
+      "year": 1993,
+      "expansion": "dominaria",
+      "precio": 3299.99,
+      "rareza": "mythic",
+      "texto": "Artifact, NM EN, stock 20, etc.",
+      "imagen": "https://example.com/images/black-lotus.jpg",
+      "createdAt": "2026-02-20T10:00:00.000Z",
+      "updatedAt": "2026-02-20T10:00:00.000Z"
+    }
+  ]
 }
 ```
 
-#### GET /api/v1/cards?page=1&limit=10
-Lista cartas con paginación.
+---
+
+#### GET /api/v1/cartas/carta/:id
+Obtiene una carta por su ID de MongoDB.
 
 Ejemplo:
 ```bash
-curl -X GET "http://localhost:3000/api/v1/cards?page=1&limit=10"
+curl -X GET http://localhost:3000/api/v1/cartas/carta/6650c1a2b3c4d5e6f7a8b9c0
 ```
 
-Respuesta ejemplo (200):
+Respuestas posibles:
+- `200 OK` con `{ "status": { ...documento... } }`
+- `404 Not Found` con `{ "status": "Carta not found" }`
+- `400 Bad Request` si el ID tiene formato inválido.
+
+---
+
+#### POST /api/v1/cartas/publicar
+Crea una carta nueva. **Este endpoint ya espera los campos en inglés**.
+
+Body de ejemplo (JSON):
 ```json
 {
-	"status": [],
-	"page": 1,
-	"limit": 10,
-	"total": 42,
-	"pages": 5
+  "name": "Black Lotus",
+  "year": 1993,
+  "expansion": "dominaria",
+  "price": 3299.99,
+  "rarity": "mythic",
+  "text": "Artifact, NM EN, stock 20, etc.",
+  "imageUrl": "https://assets.moxfield.net/cards/card-Yn1Gp-normal.webp?203543493"
 }
 ```
 
-#### GET /api/v1/cards/:id
-Obtiene una carta por ID.
-
-Ejemplo:
+Ejemplo cURL:
 ```bash
-curl -X GET http://localhost:3000/api/v1/cards/65f0c1a2b3c4d5e6f7a8b9c0
+curl -X POST http://localhost:3000/api/v1/cartas/publicar \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Black Lotus",
+    "year": 1993,
+    "expansion": "dominaria",
+    "price": 3299.99,
+    "rarity": "mythic",
+    "text": "Artifact, NM EN, stock 20, etc.",
+    "imageUrl": "https://assets.moxfield.net/cards/card-Yn1Gp-normal.webp?203543493"
+  }'
 ```
 
-#### GET /api/v1/cards/card/:id
-Ruta legacy para obtener una carta por ID.
+Respuestas posibles:
+- `200 OK` con `{ "status": "Se ha añadido la carta correctamente", "data": { ...cartaGuardada } }`
+- `400 Bad Request` con `{ "status": "Faltan campos" }` si falta alguno de los campos requeridos.
+- `400 Bad Request` con `{ "status": "Carta ya existe" }` si ya hay una carta con el mismo `name`.
+- `500 Internal Server Error` con `{ "status": "..." }` si ocurre un error de servidor/BD.
 
-Ejemplo:
-```bash
-curl -X GET http://localhost:3000/api/v1/cards/card/65f0c1a2b3c4d5e6f7a8b9c0
-```
+---
 
-#### GET /api/v1/cards/movie/:id
-Ruta legacy alternativa para obtener una carta por ID.
+#### PUT /api/v1/cartas/editar/:id
+Actualiza una carta por ID. Acepta cuerpo parcial; solo los campos enviados se actualizan.
 
-Ejemplo:
-```bash
-curl -X GET http://localhost:3000/api/v1/cards/movie/65f0c1a2b3c4d5e6f7a8b9c0
-```
-
-#### GET /api/v1/cards/collections
-Devuelve colecciones distintas (`collection`).
-
-Nota técnica actual:
-- Este endpoint está definido en el backend, pero puede devolver `400` en el estado actual por el orden de rutas (`/:id` está antes de `/collections`).
-
-Ejemplo:
-```bash
-curl -X GET http://localhost:3000/api/v1/cards/collections
-```
-
-Respuesta ejemplo (200):
+Ejemplo de body (JSON):
 ```json
 {
-	"status": ["Revised", "Alpha", "Modern Horizons"]
+  "rarity": "mythic",
+  "text": "Reimpresión de la carta original."
 }
 ```
 
-#### POST /api/v1/cards
-Crea una carta.
-
-Ejemplo:
+Ejemplo cURL:
 ```bash
-curl -X POST http://localhost:3000/api/v1/cards \
-	-H "Content-Type: application/json" \
-	-d '{
-		"name": "Counterspell",
-		"collection": "Ice Age",
-		"rarity": "Common",
-		"type": "Instant",
-		"price": 2.2,
-		"stock": 20,
-		"language": "EN",
-		"condition": "EX",
-		"imageUrl": "https://example.com/images/counterspell.jpg"
-	}'
+curl -X PUT http://localhost:3000/api/v1/cartas/editar/6650c1a2b3c4d5e6f7a8b9c0 \
+  -H "Content-Type: application/json" \
+  -d '{
+    "rarity": "mythic",
+    "text": "Reimpresión de la carta original."
+  }'
 ```
 
-Respuesta esperada (201):
-```json
-{
-	"status": "Card Successfully Inserted"
-}
-```
+Respuestas posibles:
+- `200 OK` con `{ "status": "Carta Successully Updated" }`
+- `404 Not Found` con `{ "status": "Carta not found" }` si el ID no existe.
+- `400 Bad Request` con `{ "status": "..." }` si hay error de validación o ID inválido.
 
-#### PUT /api/v1/cards/:id
-Actualiza una carta por ID (campos parciales o completos).
+---
 
-Ejemplo:
-```bash
-curl -X PUT http://localhost:3000/api/v1/cards/65f0c1a2b3c4d5e6f7a8b9c0 \
-	-H "Content-Type: application/json" \
-	-d '{
-		"price": 3.0,
-		"stock": 18
-	}'
-```
-
-Respuesta esperada (200):
-```json
-{
-	"status": "Card Successfully Updated"
-}
-```
-
-#### DELETE /api/v1/cards/:id
+#### DELETE /api/v1/cartas/eliminar/:id
 Elimina una carta por ID.
 
-Ejemplo:
+Ejemplo cURL:
 ```bash
-curl -X DELETE http://localhost:3000/api/v1/cards/65f0c1a2b3c4d5e6f7a8b9c0
+curl -X DELETE http://localhost:3000/api/v1/cartas/eliminar/6650c1a2b3c4d5e6f7a8b9c0
 ```
 
-Respuesta esperada (200):
-```json
-{
-	"status": "Card Successfully Deleted"
-}
-```
-
-#### Compatibilidad `/movies`
-Las mismas operaciones anteriores existen también sobre `/api/v1/movies`.
-
-Ejemplos rápidos:
-```bash
-curl -X GET http://localhost:3000/api/v1/movies
-curl -X GET http://localhost:3000/api/v1/movies/65f0c1a2b3c4d5e6f7a8b9c0
-curl -X POST http://localhost:3000/api/v1/movies -H "Content-Type: application/json" -d '{"name":"...","collection":"...","rarity":"...","type":"...","price":1,"stock":1,"language":"EN","condition":"NM","imageUrl":"https://example.com/image.jpg"}'
-curl -X PUT http://localhost:3000/api/v1/movies/65f0c1a2b3c4d5e6f7a8b9c0 -H "Content-Type: application/json" -d '{"stock":99}'
-curl -X DELETE http://localhost:3000/api/v1/movies/65f0c1a2b3c4d5e6f7a8b9c0
-```
+Respuestas posibles:
+- `200 OK` con `{ "status": "Carta Successully Deleted" }`
+- `404 Not Found` con `{ "status": "Carta not found" }`.
+- `400 Bad Request` con `{ "status": "..." }` si el ID tiene formato inválido.
 
 ---
 
-### 3.3 Users
-
-Modelo `User` (campos requeridos):
-- `name` (string)
-- `email` (string, único)
-
-#### GET /api/v1/users
-Lista usuarios.
-```bash
-curl -X GET http://localhost:3000/api/v1/users
-```
-
-#### GET /api/v1/users/:id
-Obtiene un usuario por ID.
-```bash
-curl -X GET http://localhost:3000/api/v1/users/65f0c1a2b3c4d5e6f7a8b9c1
-```
-
-#### POST /api/v1/users
-Crea un usuario.
-```bash
-curl -X POST http://localhost:3000/api/v1/users \
-	-H "Content-Type: application/json" \
-	-d '{
-		"name": "Hector",
-		"email": "hector@example.com"
-	}'
-```
-
-Respuesta esperada (201):
-```json
-{ "status": "User Successfully Inserted" }
-```
-
-#### PUT /api/v1/users/:id
-Actualiza un usuario.
-```bash
-curl -X PUT http://localhost:3000/api/v1/users/65f0c1a2b3c4d5e6f7a8b9c1 \
-	-H "Content-Type: application/json" \
-	-d '{
-		"name": "Hector Ruiz"
-	}'
-```
-
-#### DELETE /api/v1/users/:id
-Elimina un usuario.
-```bash
-curl -X DELETE http://localhost:3000/api/v1/users/65f0c1a2b3c4d5e6f7a8b9c1
-```
-
----
-
-### 3.4 Carts
-
-Modelo `Cart`:
-- `userId` (ObjectId de `User`, requerido)
-- `items` (array)
-	- `cardId` (ObjectId de `Card`, requerido)
-	- `quantity` (number >= 1)
-	- `price` (number >= 0)
-- `status` (string, por defecto `open`)
-
-#### GET /api/v1/carts
-Lista carritos.
-```bash
-curl -X GET http://localhost:3000/api/v1/carts
-```
-
-#### GET /api/v1/carts/:id
-Obtiene un carrito por ID.
-```bash
-curl -X GET http://localhost:3000/api/v1/carts/65f0c1a2b3c4d5e6f7a8b9d1
-```
-
-#### POST /api/v1/carts
-Crea un carrito.
-```bash
-curl -X POST http://localhost:3000/api/v1/carts \
-	-H "Content-Type: application/json" \
-	-d '{
-		"userId": "65f0c1a2b3c4d5e6f7a8b9c1",
-		"items": [
-			{
-				"cardId": "65f0c1a2b3c4d5e6f7a8b9c0",
-				"quantity": 2,
-				"price": 4.5
-			}
-		],
-		"status": "open"
-	}'
-```
-
-Respuesta esperada (201):
-```json
-{ "status": "Cart Successfully Inserted" }
-```
-
-#### PUT /api/v1/carts/:id
-Actualiza un carrito.
-```bash
-curl -X PUT http://localhost:3000/api/v1/carts/65f0c1a2b3c4d5e6f7a8b9d1 \
-	-H "Content-Type: application/json" \
-	-d '{
-		"status": "closed"
-	}'
-```
-
-#### DELETE /api/v1/carts/:id
-Elimina un carrito.
-```bash
-curl -X DELETE http://localhost:3000/api/v1/carts/65f0c1a2b3c4d5e6f7a8b9d1
-```
-
----
-
-### 3.5 Orders
-
-Modelo `Order`:
-- `userId` (ObjectId de `User`, requerido)
-- `items` (array)
-	- `cardId` (ObjectId de `Card`, requerido)
-	- `quantity` (number >= 1)
-	- `price` (number >= 0)
-- `total` (number >= 0, requerido)
-- `status` (string, por defecto `pending`)
-
-#### GET /api/v1/orders
-Lista pedidos.
-```bash
-curl -X GET http://localhost:3000/api/v1/orders
-```
-
-#### GET /api/v1/orders/:id
-Obtiene un pedido por ID.
-```bash
-curl -X GET http://localhost:3000/api/v1/orders/65f0c1a2b3c4d5e6f7a8b9e1
-```
-
-#### POST /api/v1/orders
-Crea un pedido.
-```bash
-curl -X POST http://localhost:3000/api/v1/orders \
-	-H "Content-Type: application/json" \
-	-d '{
-		"userId": "65f0c1a2b3c4d5e6f7a8b9c1",
-		"items": [
-			{
-				"cardId": "65f0c1a2b3c4d5e6f7a8b9c0",
-				"quantity": 2,
-				"price": 4.5
-			}
-		],
-		"total": 9,
-		"status": "pending"
-	}'
-```
-
-Respuesta esperada (201):
-```json
-{ "status": "Order Successfully Inserted" }
-```
-
-#### PUT /api/v1/orders/:id
-Actualiza un pedido.
-```bash
-curl -X PUT http://localhost:3000/api/v1/orders/65f0c1a2b3c4d5e6f7a8b9e1 \
-	-H "Content-Type: application/json" \
-	-d '{
-		"status": "paid"
-	}'
-```
-
-#### DELETE /api/v1/orders/:id
-Elimina un pedido.
-```bash
-curl -X DELETE http://localhost:3000/api/v1/orders/65f0c1a2b3c4d5e6f7a8b9e1
-```
-
----
-
-### 3.6 Códigos HTTP usados en la API
+### 3.3 Códigos HTTP usados en la API
 
 - `200 OK`: consulta/actualización/eliminación correcta.
-- `201 Created`: creación correcta.
 - `400 Bad Request`: validación fallida o ID mal formado.
 - `404 Not Found`: recurso no encontrado.
+- `500 Internal Server Error`: error interno de servidor o base de datos.
 
 4.0 Modelo de datos, relaciones y reglas de negocio
 

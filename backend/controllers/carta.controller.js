@@ -24,26 +24,39 @@ cartaCtrl.getCarta = async (req, res) => {
 
 // Agregar una carta nueva
 cartaCtrl.addCarta = async (req, res) => {
+    // Ahora el endpoint espera los campos en inglés en el body
+    // name, year, expansion, price, rarity, text, imageUrl
+    const { name, year, expansion, price, rarity, text, imageUrl } = req.body;
+
     // validar campos obligatorios
-    let { nombre, year, expansion, precio, rareza, texto, imagen } = req.body;
-    if (!nombre || !year || !expansion || !precio || !rareza || !texto || !imagen) {
-        return res.status(400).json({status: 'Faltan campos'});
+    if (!name || !year || !expansion || !price || !rarity || !text || !imageUrl) {
+        return res.status(400).json({ status: 'Faltan campos' });
     }
 
     try {
         // verificar duplicado por nombre
-        const existente = await Carta.findOne({ nombre: nombre });
+        const existente = await Carta.findOne({ nombre: name });
         if (existente) {
-            return res.status(400).json({status: 'Carta ya existe'});
+            return res.status(400).json({ status: 'Carta ya existe' });
         }
 
-        const carta = new Carta(req.body);
+        // mapear campos en inglés al esquema del modelo
+        const carta = new Carta({
+            nombre: name,
+            year: year,
+            expansion: expansion,
+            precio: price,
+            rareza: rarity,
+            texto: text,
+            imagen: imageUrl
+        });
+
         const data = await carta.save();
-        return res.status(200).json({status: 'Se ha añadido la carta correctamente', data});
+        return res.status(200).json({ status: 'Se ha añadido la carta correctamente', data });
     } catch (err) {
         // devolver mensaje legible y usar código 500 para problemas del servidor/BD
         const message = err && err.message ? err.message : JSON.stringify(err);
-        return res.status(500).json({status: message || 'Error desconocido'});
+        return res.status(500).json({ status: message || 'Error desconocido' });
     }
 };
 
