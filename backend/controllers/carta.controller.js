@@ -24,31 +24,56 @@ cartaCtrl.getCarta = async (req, res) => {
 
 // Agregar una carta nueva
 cartaCtrl.addCarta = async (req, res) => {
-    // Ahora el endpoint espera los campos en inglés en el body
-    // name, year, expansion, price, rarity, text, imageUrl
-    const { name, year, expansion, price, rarity, text, imageUrl } = req.body;
+    // El frontend trabaja con campos en inglés (name, collection, rarity, ...)
+    // Usamos un objeto vacío por defecto para evitar errores si req.body es undefined
+    const {
+        name,
+        collection,
+        rarity,
+        type,
+        price,
+        stock,
+        language,
+        condition,
+        imageUrl,
+        // campos legacy opcionales
+        year,
+        expansion,
+        text,
+    } = req.body || {};
 
-    // validar campos obligatorios
-    if (!name || !year || !expansion || !price || !rarity || !text || !imageUrl) {
-        return res.status(400).json({ status: 'Faltan campos' });
+    // validar campos obligatorios principales
+    if (!name || !collection || !rarity || !price || !imageUrl) {
+        return res.status(400).json({ status: 'Faltan campos obligatorios' });
     }
 
     try {
-        // verificar duplicado por nombre
-        const existente = await Carta.findOne({ nombre: name });
+        // verificar duplicado por nombre (inglés)
+        const existente = await Carta.findOne({ name });
         if (existente) {
             return res.status(400).json({ status: 'Carta ya existe' });
         }
 
-        // mapear campos en inglés al esquema del modelo
+        // mapear campos al esquema, guardando tanto en inglés como en español (compatibilidad)
         const carta = new Carta({
+            // campos en inglés usados por los frontends
+            name,
+            collection,
+            rarity,
+            type,
+            price,
+            stock,
+            language,
+            condition,
+            imageUrl,
+            // campos legacy en español
             nombre: name,
-            year: year,
-            expansion: expansion,
-            precio: price,
+            expansion: expansion || collection,
             rareza: rarity,
+            precio: price,
             texto: text,
-            imagen: imageUrl
+            imagen: imageUrl,
+            year,
         });
 
         const data = await carta.save();
@@ -62,16 +87,91 @@ cartaCtrl.addCarta = async (req, res) => {
 
 // Actualizar una carta
 cartaCtrl.updateCarta = async (req, res) => {
-    const carta = req.body;
-    await Carta.findByIdAndUpdate(
-        req.params.id,
-        {$set: carta},
-        {new: true})
-        .then((data)=> {
-            if(data)res.status(200).json({status:'Carta Successully Updated'});
-            else res.status(404).json({status:'Carta not found'})
-        })
-        .catch((err)=>res.status(400).json({status:err}));
+    // El frontend envía los campos en inglés
+    // Usamos un objeto vacío por defecto para evitar errores si req.body es undefined
+    const {
+        name,
+        collection,
+        rarity,
+        type,
+        price,
+        stock,
+        language,
+        condition,
+        imageUrl,
+        // campos legacy opcionales
+        year,
+        expansion,
+        text,
+    } = req.body || {};
+
+    // Construir el objeto de actualización mapeando a los nombres del esquema
+    const update = {};
+
+    // Inglés + español en paralelo para mantener compatibilidad
+    if (name !== undefined) {
+        update.name = name;
+        update.nombre = name;
+    }
+    if (collection !== undefined) {
+        update.collection = collection;
+        update.expansion = collection;
+    }
+    if (rarity !== undefined) {
+        update.rarity = rarity;
+        update.rareza = rarity;
+    }
+    if (type !== undefined) {
+        update.type = type;
+    }
+    if (price !== undefined) {
+        update.price = price;
+        update.precio = price;
+    }
+    if (stock !== undefined) {
+        update.stock = stock;
+    }
+    if (language !== undefined) {
+        update.language = language;
+    }
+    if (condition !== undefined) {
+        update.condition = condition;
+    }
+    if (imageUrl !== undefined) {
+        update.imageUrl = imageUrl;
+        update.imagen = imageUrl;
+    }
+    if (year !== undefined) {
+        update.year = year;
+    }
+    if (expansion !== undefined) {
+        update.expansion = expansion;
+    }
+    if (text !== undefined) {
+        update.texto = text;
+    }
+
+    // Si no hay ningún campo válido para actualizar, devolvemos un error claro
+    if (Object.keys(update).length === 0) {
+        return res.status(400).json({ status: 'No hay campos válidos para actualizar' });
+    }
+
+    try {
+        const data = await Carta.findByIdAndUpdate(
+            req.params.id,
+            { $set: update },
+            { new: true, runValidators: true }
+        );
+
+        if (data) {
+            return res.status(200).json({ status: 'Carta Successfully Updated', data });
+        } else {
+            return res.status(404).json({ status: 'Carta not found' });
+        }
+    } catch (err) {
+        const message = err && err.message ? err.message : JSON.stringify(err);
+        return res.status(400).json({ status: message || 'Error desconocido' });
+    }
 };
 
 // Eliminar una carta
